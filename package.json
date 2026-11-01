@@ -1,0 +1,15 @@
+{
+  "name": "lobster-3d",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Homarus HX-4: an interactive 3D robotic lobster you can drive, take apart and record. One HTML file.",
+  "license": "MIT",
+  "scripts": {
+    "setup": "npm install && npx playwright install chromium",
+    "stills": "node tools/stills.js",
+    "record": "node tools/record.js"
+  },
+  "devDependencies": {
+    "playwright": "1.58.2"
+  }
+}
