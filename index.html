@@ -369,6 +369,19 @@ class Kit{
   piston(a,b,r){ const m=a.clone().lerp(b,.55); this.rod(a,m,r,'black'); this.rod(m,b,r*.5,'chrome');
     const d=b.clone().sub(a).normalize(); this.rod(m.clone().addScaledVector(d,-r*.6),m.clone().addScaledVector(d,r*.6),r*1.12,'orange');
     this.sph(r*1.1,'black',a.x,a.y,a.z,1,1,1,10,8); this.sph(r*.8,'black',b.x,b.y,b.z,1,1,1,10,8); return this; }
+  // rivet: a small domed fastener at p, its axis along the surface normal n
+  rivet(p,n,r,mk){ const g=new THREE.CylinderGeometry(r*.8,r,r*.9,7).toNonIndexed();
+    g.applyMatrix4(new THREE.Matrix4().compose(p,new THREE.Quaternion().setFromUnitVectors(V3(0,1,0),n.clone().normalize()),V3(1,1,1))); return this.push(g,mk||'black'); }
+  // coil spring from a to b: coil radius R, n turns, wire radius t (a coilover round a piston)
+  spring(a,b,R,n,t,mk){ const d=b.clone().sub(a), L=d.length(), pts=[];
+    for(let i=0;i<=n*12;i++){ const th=i/12*PI*2; pts.push(V3(Math.cos(th)*R,L*i/(n*12),Math.sin(th)*R)); }
+    const g=new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),n*14,t,5,false).toNonIndexed();
+    g.applyMatrix4(new THREE.Matrix4().compose(a,new THREE.Quaternion().setFromUnitVectors(V3(0,1,0),d.normalize()),V3(1,1,1))); return this.push(g,mk||'steel'); }
+  // n beads threaded on a curve, radius rr(u) at u = 0..1 along it, materials cycling through mks
+  beads(curve,n,rr,len,mks){ const P=V3(0,0,0), T=V3(0,0,0);
+    for(let i=1;i<=n;i++){ const u=i/(n+1); curve.getPointAt(u,P); curve.getTangentAt(u,T); const g=new THREE.CylinderGeometry(rr(u),rr(u),len,12).toNonIndexed();
+      g.applyMatrix4(new THREE.Matrix4().compose(P,new THREE.Quaternion().setFromUnitVectors(V3(0,1,0),T),V3(1,1,1))); this.push(g,mks[i%mks.length]); }
+    return this; }
   gear(x,y,z,r,w,n,mk,axis){ const R=axis==='z'?[HP,0,0]:axis==='y'?[0,0,0]:[0,0,HP];
     this.cyl(r,r,w,mk||'steel',x,y,z,R[0],R[1],R[2],24);
     for(let i=0;i<n;i++){ const a=i/n*PI*2, c=Math.cos(a)*(r+.0035), s=Math.sin(a)*(r+.0035);
@@ -406,6 +419,10 @@ const A={}; // anchors for labels & cameras
   k.piece('cables',0,.04,0);
   for(const s of [-1,1]){ k.cable([V3(s*.02,.04,.17),V3(s*.05,.05,.1),V3(s*.045,.045,0),V3(s*.055,.05,-.12),V3(s*.03,.04,-.26)],.0045,s>0?'orange':'black');
     k.cable([V3(s*.01,.045,.15),V3(s*.025,.055,.04),V3(s*.02,.05,-.1),V3(s*.012,.045,-.24)],.004,'black'); }
+  // wiring harness: 22 seeded runs above the cells (y ≥ 0.046), inside the plate-lift pistons (|x| ≤ 0.045), orange connector sleeves
+  for(let i=0;i<22;i++){ const x0=(rnd()-.5)*.09, y0=.048+rnd()*.012, r=.0014+rnd()*.0012, pts=[];
+    for(let j=0;j<=5;j++) pts.push(V3(clamp(x0+(rnd()-.5)*.02,-.045,.045),clamp(y0+(rnd()-.5)*.008,.046,.06),.1-j*.076));
+    k.cable(pts,r,i%5===0?'orange':'black'); for(const p of [pts[0],pts[5]]) k.cyl(r*1.8,r*1.8,.008,'orange',p.x,p.y,p.z,HP,0,0,8); }
   k.piece('core',0,.1,.04);
   k.cyl(.026,.026,.07,'glow',0,.03,.1,HP,0,0,20); k.cyl(.03,.03,.012,'chrome',0,.03,.137,HP); k.cyl(.03,.03,.012,'chrome',0,.03,.063,HP);
   for(let i=0;i<3;i++) k.tor(.03,.003,'black',0,.03,.075+i*.02);
@@ -429,6 +446,13 @@ for(let i=0;i<7;i++){ const k=new Kit(); const r=SHELL.r(i), len=SHELL.len, sy=S
   k.box(.008,.004,len*.9,'black',0,r*sy+.001,0);                                   // dorsal ridge
   for(const c of [-3,-2,-1,1,2,3]) for(const z of [.013,-.009]){ const a=c*.15; k.box(.0032,.0022,.015,'black',Math.sin(a)*r,Math.cos(a)*r*sy+.0004,z,0,0,-a*.85); } // tergite slits
   for(const s of [-1,1]) for(const z of [-.022,-.007,.008,.023]) k.cyl(.0022,.0022,.003,'chrome',s*Math.sin(1.35)*r*1.004,Math.cos(1.35)*r*sy,z,0,0,-s*1.2,6); // flank bolt row
+  // riveted seams along both edges (black on the white back, chrome on the black flanks), the normal of the ellipse ∝ (sin a·sy, cos a)
+  for(const z of [len/2-.006,-len/2+.009]) for(let a=-1.32;a<=1.33;a+=.12){ if(Math.abs(a)<.05) continue;
+    k.rivet(V3(Math.sin(a)*r*1.002,Math.cos(a)*r*sy*1.002,z),V3(Math.sin(a)*sy,Math.cos(a),0),.0019,Math.abs(a)<TA?'black':'chrome'); }
+  for(const a of [-.55,.55]) k.box(.0016,.0016,len*.94,'black',Math.sin(a)*r,Math.cos(a)*r*sy+.0002,0,0,0,-Math.atan2(Math.sin(a)*sy,Math.cos(a))); // panel grooves
+  if(i===1||i===6) for(const s of [-1,1]){ const a=s*1.22, n=V3(Math.sin(a)*sy,Math.cos(a),0).normalize(), rz=-Math.atan2(n.x,n.y), x=Math.sin(a)*r*1.004, y=Math.cos(a)*r*sy;
+    k.box(.02,.0026,.03,'white',x,y,0,0,0,rz); k.box(.013,.0034,.02,'orange',x,y,0,0,0,rz);
+    for(const z of [-.011,.011]) k.rivet(V3(x,y,z).addScaledVector(n,.0014),n,.0016,'chrome'); } // service hatches
   for(const s of [-1,1]){
     const a=s*.6; k.cyl(.004,.004,.004,'chrome',Math.sin(a)*r,Math.cos(a)*r*sy+.001,.02,0,0,-a*.8,8); k.cyl(.004,.004,.004,'chrome',Math.sin(a)*r,Math.cos(a)*r*sy+.001,-.02,0,0,-a*.8,8);
     if(i>=2&&i<=5){ const b=s*1.15; for(const z of [-.016,0,.016]) k.box(.004,.014,.011,'steel',Math.sin(b)*r*1.01,Math.cos(b)*r*sy,z,0,0,-b*.8); } // gill vents
@@ -460,6 +484,7 @@ const HEAD={z:.111, len:.14};                                                   
   k.box(.06,.02,.05,'black',0,0,0); k.servo(0,.012,0,.016,.012,'y',.45);
   k.piece('eyes',0,.07,.04);
   for(const s of [-1,1]){ k.rod(V3(s*.012,.012,.012),V3(s*.03,.042,.04),.0055,'black'); k.sph(.011,'lens',s*.032,.046,.044); k.tor(.0105,.0022,'orange',s*.032,.046,.044,0,s*.6,0);
+    k.tor(.0128,.0026,'white',s*.032-s*.0017,.046,.044-.0025,0,s*.6,0); k.tor(.006,.0013,'chrome',s*.032+s*.0054,.046,.044+.0078,0,s*.6,0); // collar, inner ring
     k.cyl(.007,.007,.01,'white',s*.02,.026,.024,.6,0,-s*.5,12); }
   k.piece('rostrum',0,.02,.06);
   k.cone(.011,.085,'white',0,.012,.07,HP,0,0); k.box(.004,.004,.06,'orange',0,.021,.06);
@@ -474,10 +499,12 @@ for(const s of [1,-1]){ const g=new THREE.Group(); g.position.set(s*.035,.03,.23
   const k=new Kit(); k.servo(0,0,0,.012,.016,'x',.45);
   k.piece('whip',s*.05,.03,.04);
   k.put(taperTube(ANT_PATH(s),.0075,48,.92),'black');
+  k.beads(new THREE.CatmullRomCurve3(ANT_PATH(s)),34,u=>.0075*Math.max(.02,1-u*.92)*1.5+.0006,.004,['black','black','orange']); // beaded, as on a cable tentacle
   for(let i=0;i<5;i++){ const t=.02+i*.024; k.tor(.0085-i*.0006,.0018,'orange',s*.004*i,.009*i,t+.008,-.35,s*.12,0); }
   k.piece('scale',s*.04,.02,.03); k.box(.018,.004,.06,'white',s*.024,.012,.05,0,s*.3,0); k.box(.019,.0045,.012,'orange',s*.03,.012,.08,0,s*.3,0);
   k.piece('short',0,.04,.04);
-  for(const d of [-1,1]) k.put(taperTube([V3(-s*.012,.004,0),V3(-s*.014+d*.006,.03,.06),V3(-s*.01+d*.018,.05,.13)],.0032,16,.8),'orange');
+  for(const d of [-1,1]){ const fp=[V3(-s*.012,.004,0),V3(-s*.014+d*.006,.03,.06),V3(-s*.01+d*.018,.05,.13)];
+    k.put(taperTube(fp,.0032,16,.8),'orange'); k.beads(new THREE.CatmullRomCurve3(fp),6,u=>.0032*(1-u*.8)*1.5,.003,['black']); }
   g.add(k.build('sensors',s>0?'antenna':null)); antGroups.push({g,s}); if(s>0) A.antenna=g; }
 
 // ---- walking legs: slim, from under the carapace skirt. Lengths along each link scale with M.femur / M.footTip ----
@@ -493,11 +520,12 @@ LEGS.forEach(L=>{
   k.piece('shell',0,.05,0);
   k.cbox(F*.72,.024,.024,'white',F*.55,0,0);
   for(const z of [-1,1]) k.cbox(F*.6,.016,.003,'black',F*.55,-.001,z*.0128);                    // black side plates
+  for(const z of [-1,1]) for(let i=0;i<5;i++) k.rivet(V3(F*(.31+i*.12),-.003,z*.0145),V3(0,0,z),.0013,'chrome');
   k.box(F*.58,.005,.02,'black',F*.55,.0125,0); k.perf(5,2,F*.1,.008,.0035,0,'steel',F*.55,.0152,0); // top rib, perforated
   k.cbox(.022,.026,.028,'orange',F*.86,0,0);
   for(let i=0;i<3;i++) k.box(.009,.003,.026,'black',F*(.3+i*.15),-.0125,0);
   for(const x of [.3,.8]) for(const z of [-1,1]) k.cyl(.0024,.0024,.004,'chrome',F*x,.004,z*.0145,HP,0,0,6);
-  k.piece('rod',0,-.04,0); k.piston(V3(F*.18,-.016,0),V3(F*.86,-.018,0),.0042);
+  k.piece('rod',0,-.04,0); k.piston(V3(F*.18,-.022,0),V3(F*.86,-.024,0),.0042); k.spring(V3(F*.3,-.0224,0),V3(F*.8,-.0237,0),.0068,7,.0009); // coilover, top 8.5 mm under the shell
   fem.add(k.build(key,L.nm==='L2'?'legL2f':null));
   const tib=new THREE.Group(); tib.position.x=F; fem.add(tib);
   k=new Kit();
@@ -527,7 +555,7 @@ for(const s of [1,-1]){ const key=s>0?'clawL':'clawR', crush=s>0;
   k.cbox(.034,.03,.13,'white',0,0,.077); for(const x of [-1,1]) k.cbox(.003,.02,.1,'black',x*.0172,-.002,.077); // merus shell, black side plates
   k.box(.024,.005,.1,'black',0,.0165,.077); k.perf(2,6,.012,.014,.0034,0,'steel',0,.0192,.072); k.cbox(.037,.034,.022,'orange',0,0,.128);
   for(const z of [.03,.11]) for(const x of [-1,1]) k.cyl(.0024,.0024,.004,'chrome',x*.0185,.008,z,0,0,HP,6);
-  k.piston(V3(0,-.017,.03),V3(0,-.019,.135),.0045);                                // grip/elbow actuator under the merus
+  k.piston(V3(0,-.026,.03),V3(0,-.027,.135),.0045); k.spring(V3(0,-.0264,.05),V3(0,-.0268,.12),.0075,8,.001);                                // grip/elbow actuator under the merus
   for(let i=0;i<3;i++) k.cone(.004,.012,'black',0,.024,.04+i*.03);                    // merus spines
   base.add(k.build(key));
   const elbow=new THREE.Group(); elbow.position.z=.15; elbow.rotation.y=-s*.75; base.add(elbow);
@@ -547,6 +575,12 @@ for(const s of [1,-1]){ const key=s>0?'clawL':'clawR', crush=s>0;
   k.box(.05,.004,.022,'orange',0,.03,.05);
   for(let c=-2;c<=2;c++) for(const z of [.078,.096,.114]){ const x=c*.0085, y=.002+.028*Math.sqrt(Math.max(0,1-(x/.046)**2-((z-.07)/.08)**2)); k.box(.0032,.0022,.011,'black',x,y+.0006,z,0,0,-x*8); } // palm slots
   k.put(new THREE.TorusGeometry(1,.06,6,48),'black',0,.002,.07,HP,0,0,.0465,.0805,.05);   // seam where the shell meets the black belly
+  { const E=p=>V3(p.x/.046**2,(p.y-.002)/.028**2,(p.z-.07)/.08**2).normalize();          // palm ellipsoid normal
+    for(const lon of [-.65,.65]){ const pts=[];                                           // riveted meridian grooves, clear of the slots and the strip
+      for(let j=0;j<=10;j++){ const zz=-.065+j*.013, s2=Math.sqrt(Math.max(0,1-(zz/.08)**2)), p=V3(Math.sin(lon)*.046*s2,.002+Math.cos(lon)*.028*s2,.07+zz);
+        pts.push(p.clone().addScaledVector(E(p),.0006)); if(j%2) k.rivet(p,E(p),.0016,'black'); }
+      k.cable(pts,.0008,'black'); }
+    for(let j=0;j<22;j++){ const t=j/22*PI*2; k.rivet(V3(Math.cos(t)*.0466,.002,.07+Math.sin(t)*.0806),V3(Math.cos(t)/.046,0,Math.sin(t)/.08),.0016,'chrome'); } }
   for(const x of [-1,1]) k.cyl(.0024,.0024,.004,'chrome',x*.03,.022,.04,0,0,-x*.9,6);
   k.piece('belly',s*.03,-.06,.04);
   k.put(new THREE.SphereGeometry(1,24,10,0,PI*2,HP,HP*.8),'glass',0,0,.07,0,0,0,.045,.024,.078);
@@ -586,6 +620,9 @@ for(let i=0;i<5;i++){ const len=M.tailLen[i], w=tailW(i);
   k.put(new THREE.CylinderGeometry(w/2*.95,w/2*.95,len*1.04,30,1,true,HP,PI).rotateX(HP),'black',0,.005,-len/2,0,0,0,1,.52,1);
   k.put(new THREE.CylinderGeometry(w/2*1.01,w/2*1.01,.007,30,1,true,HP,PI).rotateX(HP),i%2?'black':'orange',0,.006,-len+.006,0,0,0,1,.56,1);
   for(let c=-2;c<=2;c++) for(const z of [-len*.32,-len*.58]){ const a=c*.2; k.box(.0034,.0022,.014,'black',Math.sin(a)*w/2,.006+Math.cos(a)*w/2*.55+.0004,z,0,0,-a*.6); } // shell slits
+  for(const z of [-.008,-len+.016]) for(let a=-1.4;a<=1.41;a+=.14){ if(Math.abs(a)<.05) continue;
+    k.rivet(V3(Math.sin(a)*w/2*1.002,.006+Math.cos(a)*w/2*.55*1.002,z),V3(Math.sin(a)*.55,Math.cos(a),0),.002,'black'); } // riveted edges
+  for(const a of [-.62,.62]) k.box(.0016,.0016,len*.9,'black',Math.sin(a)*w/2,.006+Math.cos(a)*w/2*.55+.0002,-len/2,0,0,-Math.atan2(Math.sin(a)*.55,Math.cos(a)));
   for(const sd of [-1,1]){ k.cyl(.0035,.0035,.004,'chrome',sd*w*.33,w*.21+.006,-len*.3,0,0,-sd*.7,8); }
   for(const sd of [-1,1]){ k.piece(sd>0?'pL':'pR',sd*.05,-.01,0);
     k.box(.01,.034,len*.86,'white',sd*(w/2-.004),-.01,-len/2,0,0,sd*.32); k.cone(.006,.018,'black',sd*(w/2+.002),-.032,-len*.78,PI,0,0);
