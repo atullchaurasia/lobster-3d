@@ -32,7 +32,11 @@ npm run stills    # renders/*.png, contact.png, flip-scrub.png
 npm run record    # out/hx4.mp4, out/hx4.gif (needs ffmpeg on PATH, or FFMPEG=<path>)
 ```
 
-The tools use software WebGL, so a full still pass takes about 10 minutes.
+The tools use software WebGL by default, so a full still pass takes about 10 minutes. On Windows, set `GL=gpu` to render on the machine's GPU instead. A 1080p, 60 fps recording then takes about 8 minutes:
+
+```bash
+GL=gpu node tools/record.js --size 1920x1080 --fps 60
+```
 
 ## How it's built
 

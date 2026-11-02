@@ -51,7 +51,11 @@ const CLOCK = () => {
 async function open({width = 1600, height = 900, dpr = 1} = {}) {
   const browser = await chromium.launch({
     executablePath: process.env.CHROMIUM || undefined,
-    args: ['--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist', '--use-angle=swiftshader'],
+    // GL=gpu renders on the machine's GPU through ANGLE/D3D11 (Windows): many times faster and the same image the page
+    // shows a visitor. The default is SwiftShader, which runs anywhere, including machines with no GPU.
+    args: process.env.GL === 'gpu'
+      ? ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist', '--enable-webgl']
+      : ['--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist', '--use-angle=swiftshader'],
   });
   const page = await browser.newPage({viewport: {width, height}, deviceScaleFactor: dpr});
   const errors = [];
