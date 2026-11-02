@@ -8,7 +8,7 @@ The reference implementation is `lobster.html` in this folder. When this file an
 
 ## 0. What we are building (one paragraph)
 
-A single self-contained web page (about 60–70 KB of HTML/CSS/JS, plus three.js from a CDN) that shows a robotic lobster on a pale studio floor. The lobster walks on 8 legs, opens a crusher and a pincer claw, sways two long antennae, and escapes with a tail flip: the tail fan spreads, the 5-segment tail snaps under and the whole body darts backwards. Around the 3D view sits a dense instrument console. Every number on it is calculated live from one shared model. Every subsystem has a button that pulls that part apart while the rest steps aside. Left alone, a cursor drives the page through a 26-second tour. Any click hands control to the visitor, and 25 seconds of quiet hands it back.
+A single self-contained web page (about 80 KB of HTML/CSS/JS, plus three.js from a CDN) that shows a robotic lobster on a pale studio floor. The lobster walks on 8 legs, opens a crusher and a pincer claw, sways two long antennae, and escapes with a tail flip: the tail fan spreads, the 5-segment tail snaps under and the whole body darts backwards. Around the 3D view sits a dense instrument console. Every number on it is calculated live from one shared model. Every subsystem has a button that pulls that part apart while the rest steps aside. Left alone, a cursor drives the page through a 26-second tour. Any click hands control to the visitor, and 25 seconds of quiet hands it back.
 
 Quality bar: it should look like a product reveal film, not a tech demo. Dense, precise, every part believable, nothing floating, nothing clipping, nothing typed in by hand.
 
@@ -139,9 +139,9 @@ const M = {
   footTip: 0.165,                      // m knee → foot tip as built; the IK solves to this point
   kneeMax: 4.5,                        // N·m knee servo rating → leg-servo bars are % of this
   flipClear: 0.012,                    // m the curled tail keeps above the floor (see §5.3)
-  clawPitch: 0.09, clawRear: 0.075,    // rad claws pitched down; m the body rears up when a claw is opened (§7)
+  clawPitch: 0.05, clawRear: 0.075,    // rad claws pitched down (base drums sit below the skirt); m the body rears up when a claw is opened (§7)
   showLift: 0.09,                      // m an opened leg is held up; ×1.1 the exploded diagram floats (§7)
-  hipX: 0.065, hipY: -0.045, reach: 0.2, // hip offset from centre line and below it (under the skirt), foot offset beyond hip
+  hipX: 0.09, hipY: -0.06, reach: 0.2,  // hip offset from centre line and below it, at the skirt's edge (further in, the r 24 mm femur drums rose through the flank); foot offset beyond hip
   hipZ:  [0.05, -0.02, -0.09, -0.16],  // hip positions front→back: under the rear of the carapace, behind the claws
   footZ: [0.15, 0.0, -0.12, -0.26],    // neutral foot positions front→back
   gripMax: 180, apOpen: 32, apHold: 11,// N crusher max, claw aperture open/hold in degrees
@@ -198,16 +198,21 @@ The shapes follow photos of real lobsters, not imagination. Carapace + head ≈ 
 
 ### 6.1 The `Kit` helper
 
-A `Kit` collects geometries into **pieces**. Each piece has an explode vector and a set of geometries per material. `build(key)` merges each piece's geometries per material with `mergeBufferGeometries`, giving one mesh per material per piece. Every piece is a `Group` tagged with `userData.key` (its subsystem) and `userData.ex` (its explode offset). Count every primitive in `PARTS` and show the total in the HUD (about 1,650).
+A `Kit` collects geometries into **pieces**. Each piece has an explode vector and a set of geometries per material. `build(key)` merges each piece's geometries per material with `mergeBufferGeometries`, giving one mesh per material per piece. Every piece is a `Group` tagged with `userData.key` (its subsystem) and `userData.ex` (its explode offset). Count every primitive in `PARTS` and show the total in the HUD (about 5,700 including the exploded debris; about 515 meshes, 233k triangles).
 
-Primitives: `box`, `cyl`, `sph`, `tor`, `cone`, `rod(a,b,r)` (a cylinder between two points), `cable(points, r)` (rods with sphere joints), `servo(x,y,z,r,w,axis,band)` and `gear(x,y,z,r,w,teeth,mat,axis)`.
+Primitives: `box`, `cyl`, `sph`, `tor`, `cone`, `rod(a,b,r)` (a cylinder between two points), `cable(points, r)` (rods with sphere joints), `servo(x,y,z,r,w,axis,band)`, `gear(x,y,z,r,w,teeth,mat,axis)`, and for detail density:
+- `cbox(w,h,d,mat,…,b)`: a chamfered panel (an extruded rectangle bevelled by b, default 18% of its thinnest side). Use it for shells instead of plain boxes.
+- `perf(nx,nz,px,pz,sw,sd,mat,x,y,z,rx,ry,rz)`: a grid of slots (sd > 0) or round holes (sd = 0), laid in the local x-z plane and then posed. Slits that follow a curved shell are placed one by one on the curve instead.
+- `piston(a,b,r)`: a linear actuator: black cylinder over 55%, chrome rod beyond, orange collar, black eyes at both ends.
+- `axial(geo,mat,x,y,z,axis)`: places geometry built along +y with its axis on x, y or z (used by `servo`).
 
-**The servo puck is the signature detail.** It goes on every joint:
-- black cylinder body (28 segments)
-- red band around the middle (width = band × w, radius × 1.05)
-- a white face disc on each side (r × 0.7)
-- a black hub cap (r × 0.28)
-- 6 chrome bolts on a circle at r × 0.5
+The detail level follows reference renders of a sister robot (Telson SC-8): chunky drum servos at every joint (about twice the limb thickness), chamfered panels covered in slots and holes, black side plates, and visible mechanism (pistons, cable bundles, gears) under every shell.
+
+**The drum servo is the signature detail.** It goes on every joint:
+- black lathed drum (28 segments) with chamfered edges
+- red tyre around the middle (width = band × w, radius × 1.07)
+- 16 black knurl ribs on each side of the tyre
+- on each face: a red lip (r × 0.94), a black face (r × 0.76), 8 chrome bolts on a circle at r × 0.6, a steel disc (r × 0.4) and a raised black hub (r × 0.2)
 
 **Gear:** steel disc, `n` square teeth around the rim, black hub.
 
@@ -220,6 +225,7 @@ Primitives: `box`, `cyl`, `sph`, `tor`, `cone`, `rod(a,b,r)` (a cylinder between
 - Piece `cables`: 2 thick cables (one red, one black) and 2 thin black ones, routed along the spine.
 - Piece `core`: glowing cylinder (r 26 mm, 70 mm long) with chrome end caps, 3 black rings, 2 steel gears and 1 red gear.
 - Piece `belly`: black half-shell underneath.
+- Visible mechanism, shown when the plates open: the 9 ribs are chamfered with 4 lightening holes each; a black side frame each side with 12 holes; 6 plate-lift pistons per side from the frame up to the plates, outboard of the cells (x 0.056 → 0.07); a 4-wire bus bundle per side under the spine; 4 gears along the spine.
 
 ### 6.3 Carapace plates T1–T7 (key `carapace`)
 The 7 plates together read as **one** shell (`SHELL` in the code). For i = 0..6: radius `0.085 + 0.0022·i` (widening to the rear), length 62 mm, placed at `z = 0.08 − 0.054·i`, y = 0.014.
@@ -228,12 +234,14 @@ The 7 plates together read as **one** shell (`SHELL` in the code). For i = 0..6:
 - Seams are thin black rims; **red only behind T3 (the cervical groove) and on T7's rear edge**.
 - A black dorsal ridge strip on each plate; on T3–T6, 3 steel gill-vent slats per side on the flank.
 - 2 chrome bolts each side, plus a white lip along the skirt's lower edge.
+- Tergite slits: 2 rows × 6 thin black slits per plate, each placed on the curve of the white back. A row of 4 chrome bolts along each flank.
 - When opened, each plate tilts back by `(0.18 − 0.03·i)` rad on top of its explode offset, so the plates fan open like real tergites.
 
 ### 6.4 Head and canopy (key `carapace`)
 - The carapace tapers to the rostrum: a front half-ellipsoid with T1's section (r 0.085, y × 0.82, same skirt and same two-tone split), 0.14 m long, from z 0.111 to the nose tip at z 0.251.
 - A red strip down the brow, a black ridge, 3 steel cheek vents and a servo puck on each side at the skirt.
-- Glass canopy, a low dome (scaled 0.046 × 0.026 × 0.07) on top of the head, with a black ring where it meets the shell.
+- Glass canopy, a low dome (scaled 0.046 × 0.026 × 0.07) on top of the head, with a black ring where it meets the shell and a ring of 10 chrome bolts just outside it.
+- 2 rows of black slits on the brow either side of the canopy.
 
 ### 6.5 Eyes and rostrum (key `sensors`)
 - Black base with a vertical servo.
@@ -249,34 +257,38 @@ The 7 plates together read as **one** shell (`SHELL` in the code). For i = 0..6:
 
 ### 6.7 Legs × 8 (key `legs`; L2 uses `legL2` so it can be opened alone)
 Hierarchy: `hip (yaw) → femur group (pitch) → tibia group at x = femur (knee)`. Hips sit at `(±hipX, hipY, hipZ)`, below the carapace skirt. Positions along each link are fractions of `M.femur` (F) and `M.footTip` (T), so the legs rescale with the model.
-- Hip: vertical servo puck (r 15 mm) plus a black mount block.
-- Femur: horizontal servo at the root (r 14 mm). Piece `shell`: white box 0.72F × 0.022 × 0.024 m with a black top rib, red tip band, 3 black underside slots and 2 chrome bolts. Piece `rod`: chrome push-rod with a black sleeve.
-- Knee: servo puck (r 15 mm, band 0.42).
-- Piece `shin`: white tapered cylinder (r 6 → 11 mm, 0.62T long), black collar, red band, black top strip.
-- Piece `tip`: black cuff, red ring, black cone foot (tip at T).
+- Hip: vertical drum servo (r 24 mm) plus a chamfered black mount block with 2 holes.
+- Femur: drum servo at the root (r 24 mm). Piece `shell`: chamfered white panel 0.72F × 0.024 × 0.024 m with black side plates, a black top rib perforated 5 × 2, a chamfered red tip collar, 3 black underside slots and 4 chrome bolts. Piece `rod`: a `piston` under the femur.
+- Knee: drum servo (r 25 mm, band 0.42).
+- Piece `shin`: white tapered cylinder (r 6.5 → 11.5 mm, 0.6T long), black collar, red band, black ring, black side strips, a black top strip with 4 holes, and an ankle drum (r 12.5 mm) at 0.69T.
+- Piece `tip`: black cuff, red ring, chrome ring, black cone foot (tip at T).
+- A leg that is held up (opened L2) or airborne (flip) shows no foothold ring.
 - Each leg also has a red foothold ring that appears where the swing foot will land, and a 60-point red trail of where the foot has been.
 
 ### 6.8 Claws (keys `clawL` = crusher, `clawR` = pincer)
 Chain: `base (servo, merus) → elbow (servo, carpus) → wrist (servo, palm) → finger`, held forward in a V like the real chelipeds.
-- Base at (±0.06, −0.02, 0.12), rotation (0.09, ±0.5, 0) (pitched slightly down). Piece `arm` (merus): white box 0.032 × 0.03 × 0.13 m, black top rib, red band, 3 black spines on top.
-- Elbow at z 0.15, yaw ∓0.75. Piece `arm2` (carpus): short knobby white ellipsoid, black top plate, red ring, 2 black spines on the inner side.
+- Base at (±0.068, −0.04, 0.12), rotation (`clawPitch` 0.05, ±0.5, 0). Its drum (r 23 mm) sits below the carapace skirt; higher and larger, it poked through the flank. Piece `arm` (merus): chamfered white panel 0.034 × 0.03 × 0.13 m with black side plates, a black top rib perforated 2 × 6, a chamfered red collar, 4 chrome bolts, 3 black spines on top and a `piston` underneath.
+- Elbow at z 0.15, yaw ∓0.75, drum r 28 mm. Piece `arm2` (carpus): short knobby white ellipsoid, black top plate with 3 × 2 holes, red ring, black ring, 2 black spines on the inner side.
+- Wrist drum r 18 mm with a ring of 10 chrome bolts and an elliptical black collar matching the palm's section.
 - Wrist at z 0.075, yaw ±0.35. **Scale: crusher (left) 1.55 uniform; cutter (right) 1.1 × 1.15 × 1.45, longer and slimmer.** This asymmetry is what makes it read as a lobster.
-- Piece `shell` (palm): white upper half-ellipsoid (0.046 × 0.028 × 0.08), black lower half, red top strip, 4 black slots.
+- Piece `shell` (palm): white upper half-ellipsoid (0.046 × 0.028 × 0.08), black lower half, a black seam ring where they meet, red top strip, 5 × 3 black slots on the curve, 2 chrome bolts.
 - Piece `belly`: glass lower half. Piece `gears`: 4 spur gears (r 11, 9, 8, 7 mm; 10, 8, 8, 7 teeth; one red) plus a chrome shaft, visible through the glass.
 - Piece `fixed`: the crusher's is thick and blunt (r 14 mm) with 5 red molar knobs; the cutter's is slender (r 9 mm) with 9 small red cutting teeth.
-- Finger (at z 0.125): small servo and a black tapered movable finger matching its claw: thick with 4 knobs, or slender with 9 teeth, facing the fixed one.
-- The claws stay at least 25 mm above the floor and never touch the legs or antennae (checked by exact point-in-mesh tests, §13).
+- Finger (at z 0.125): small drum (r 12 mm), 2 red bands, and a black tapered movable finger matching its claw: thick with 4 knobs, or slender with 9 teeth, facing the fixed one.
+- The claws stay at least 20 mm above the floor (24 mm measured while walking) and never touch the legs or antennae (checked by exact point-in-mesh tests, §13).
 
 ### 6.9 Abdomen: 5 segments (key `tail`)
 The tail base sits at (0, 0.018, −0.285). Each segment `i` (width `w = 0.19 − 0.012·i` (`tailW`), as wide as the carapace where they meet, length `tailLen[i]`) is its own group, chained at the previous segment's end:
-- Black core box and a transverse servo puck at the joint.
-- Piece `top`: white open half-cylinder shell (y × 0.55), black inner shell, a rear band (red on even segments, black on odd), 3 black slots and 2 chrome bolts.
-- Pieces `pL` / `pR`: a white side plate (pleuron) angled 0.32 rad, a black downward spine cone, a red edge strip and a small side servo.
+- Chamfered black core box and a transverse servo at the joint.
+- **A big drum servo on each side of every joint** (r 27 mm, at x = ±(w/2 + 0.015), clear of the pleura): the tail's signature, as on the reference.
+- A link `piston` along the top inside, seen when the shell lifts.
+- Piece `top`: white open half-cylinder shell (y × 0.55), black inner shell, a rear band (red on even segments, black on odd), 2 rows × 5 black slits on the curve and 2 chrome bolts.
+- Pieces `pL` / `pR`: a white side plate (pleuron) angled 0.32 rad, a black downward spine cone, a red edge strip, 3 black dots on its outer face and a small side servo.
 - Piece `swim`: 2 swimmerets (black rod plus red paddle) and a white belly plate.
 
 ### 6.10 Tail fan (telson key `tail`; uropods key `stinger`)
 - Transverse servo across the joint.
-- Piece `telson`: white centre plate 56 × 8 × 90 mm with a black spine, red trailing edge and 2 black side spines.
+- Piece `telson`: chamfered white centre plate 56 × 8 × 90 mm with a black spine, 2 rows of 5 black holes, red trailing edge and 2 black side spines.
 - 4 uropods, each its own group scaled 1.65: white flattened paddle, black rib, red trailing edge and 3 black fan ribs. They spread as described in §5.3.
 
 ---
@@ -298,7 +310,8 @@ The tail base sits at (0, 0.018, −0.285). Each segment `i` (width `w = 0.19 �
 | Tail flip | nothing | armed flip, repeats every 2.6 s |
 
 - Every non-Hero preset stops the walk, so the parts come apart on a still body.
-- **Exploded** (toggle or X key): everything apart, turntable on, camera pulled back to r 3.0. The whole diagram floats `showLift × 1.1` (99 mm) off the floor.
+- **Exploded** (toggle or X key): everything apart, turntable on, camera pulled back to r 2.3. The whole diagram floats `showLift × 1.1` (99 mm) off the floor.
+- **Debris:** 110 fasteners and chips (40 chrome bolts, 30 black nuts, 20 red and 20 white panel chips) as 4 instanced meshes. Their positions are seeded; they leave the body centre with `S.all`, scale in, and hang beside the body (|x| ≥ 0.38 m, z ≤ 0.3 m), clear of the parts, the legs and the antennae's sweep.
 - **No part passes through the floor or another part while apart.** The body rides low, so parts that come apart downward (leg tips along the tibia, claw belly and gears) would go under the floor. Fix that by lifting what is shown (`clawRear`, `showLift`), never by shrinking the explode or moving the camera. Explode vectors also avoid neighbours: the claw shell lifts outward `(±0.075, 0.03, 0.04)`, because straight up it rose into the antenna's arc. Check every isolate view and the exploded view for the lowest vertex and with exact point-in-mesh tests (§13).
 
 ---
@@ -310,14 +323,16 @@ The tail base sits at (0, 0.018, −0.285). Each segment `i` (width `w = 0.19 �
 
 | View | θ | φ | r | Target |
 |---|---|---|---|---|
-| hero | .85 | 1.10 | 2.3 | (0, `M.ht`, 0) |
-| clawL | .6 | 1.05 | 1.3 | crusher wrist + (0, 0, .1) |
-| tail | 1.75 | 1.28 | 1.5 | tail segment 3 |
-| legL2 | 2.2 | 1.12 | 1.0 | L2 femur + (.08, 0, 0) |
-| carapace | 1.1 | .85 | 1.35 | plate T4 |
-| sensors | .45 | 1.0 | 1.3 | left antenna + (.12, 0, .25) |
+| hero | .85 | 1.10 | 1.75 | (0, `M.ht`, 0) |
+| clawL | .6 | 1.05 | 1.0 | crusher wrist + (0, 0, .1) |
+| tail | 1.75 | 1.28 | 1.45 | tail segment 3 |
+| legL2 | 2.2 | 1.12 | 0.85 | L2 femur + (.08, 0, 0) |
+| carapace | 1.1 | .85 | 1.1 | plate T4 |
+| sensors | .45 | 1.0 | 1.1 | left antenna + (.12, 0, .25) |
 | flip | π/2 + .15 | 1.3 | 2.1 | centre |
-| exploded | 1.2 | 1.05 | 3.0 | centre |
+| exploded | 1.2 | 1.05 | 2.3 | centre |
+
+The cameras sit close, as in a product reveal: the machine fills the view and may run off its edges, so the detail reads.
 
 - Transitions take 1.3 s with cubic ease-in-out, always taking the shorter way round in θ.
 - Drag to orbit (φ clamped 0.15–1.52), scroll to zoom (r 0.35–4). Turntable = 2π / 16 s. The camera never goes below y = 0.03.
@@ -392,7 +407,7 @@ When a chip is red, its row gets a red left border and a red name. When everythi
 ## 11. Performance and quality steps
 
 - Warm every shader before the first frame: `renderer.compile(scene, camera)` after one `pose()`.
-- Merge geometry per material per piece (about 1,650 primitives become roughly 250 draw calls).
+- Merge geometry per material per piece (about 5,700 primitives become roughly 515 meshes, 233k triangles).
 - Adaptive quality: if fps stays under 36 for 2 seconds, first drop the pixel ratio to 1, then turn off shadows (set `needsUpdate` on all materials).
 - Clamp `dt` to 0.05 s.
 - Test on an integrated GPU. The target is 60 fps on a mid laptop.
@@ -426,7 +441,7 @@ When a chip is red, its row gets a red left border and a red name. When everythi
 
 The page exposes `window.__lx = { S, scene, A, setAsm, setExplode, stop }` for tests (`A` is the anchor table: parts and `part/piece` groups).
 
-Also check numerically, since a still only shows one side: the lowest world vertex in every view (nothing under the floor), and exact point-in-mesh tests (a ray from each vertex, odd hit count = inside) for antenna vs claws and claws vs legs, walking, flipping and opened. Box-only tests give false positives on merged meshes.
+Also check numerically, since a still only shows one side: the lowest world vertex in every view (nothing under the floor), and exact point-in-mesh tests (a ray from each vertex, odd hit count = inside) for antenna vs claws, claws vs legs and tail vs legs, walking, flipping and opened. Box-only tests give false positives on merged meshes. The carapace is an open shell, so ray parity doesn't work for it. Instead, test analytically for any leg or claw mesh with vertices both inside and outside its elliptical section (x/r)² + ((y − 0.014)/(0.82r))² = 1 above the skirt line: that is a part crossing the wall. Parts wholly inside, like joints mounted under the shell, are fine.
 
 ---
 
